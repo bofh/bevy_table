@@ -1,10 +1,12 @@
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     prelude::*,
-    sprite::MaterialMesh2dBundle,
+    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
     window::{PresentMode, WindowTheme},
     winit::WinitSettings,
 };
+use rand::distributions::{Distribution, Uniform};
+
 use itertools::Itertools;
 
 fn main() {
@@ -27,6 +29,7 @@ fn main() {
         ))
         .insert_resource(WinitSettings::game())
         .add_systems(Startup, setup)
+        .add_systems(Update, randomize_values)
         .run();
 }
 
@@ -41,6 +44,9 @@ impl From<Table> for Mesh {
         Mesh::from(shape::Quad::new(Vec2::new(50., 15.)))
     }
 }
+
+#[derive(Component)]
+struct Cell;
 
 fn setup(
     mut commands: Commands,
@@ -66,17 +72,39 @@ fn setup(
         .cartesian_product(0..=table.num_rows)
         .map(|(x, y)| [x as f32 * (w + p), y as f32 * (h + p)])
         .collect::<Vec<_>>();
-
+    let between = Uniform::try_from(0.0..1.0).unwrap();
+    let mut rng = rand::thread_rng();
     for point in positions {
-        commands.spawn(MaterialMesh2dBundle {
-            mesh: meshes.add(shape::Quad::new(Vec2::new(w, h)).into()).into(),
-            material: materials.add(ColorMaterial::from(Color::LIME_GREEN)),
-            transform: Transform::from_translation(Vec3::new(
-                point[0] - width / 3.,
-                point[1] - height / 3.,
-                0.,
-            )),
-            ..default()
-        });
+        let v = between.sample(&mut rng);
+
+        let mut mesh = Mesh::from(shape::Quad::new(Vec2::new(w, h)));
+        let c = (if v > 0.5 { Color::GREEN } else { Color::RED }).as_rgba_f32();
+        let vertex_colors: Vec<[f32; 4]> = vec![c, c, c, c];
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vertex_colors);
+        let mesh_handle: Mesh2dHandle = meshes.add(mesh).into();
+        commands
+            .spawn(MaterialMesh2dBundle {
+                mesh: mesh_handle,
+                material: materials.add(ColorMaterial::default()),
+                transform: Transform::from_translation(Vec3::new(
+                    point[0] - width / 3.,
+                    point[1] - height / 3.,
+                    0.,
+                )),
+                ..default()
+            })
+            .insert(Cell);
+    }
+}
+
+fn randomize_values(query: Query<&Mesh2dHandle, With<Cell>>, mut meshes: ResMut<Assets<Mesh>>) {
+    let between = Uniform::try_from(0.0..1.0).unwrap();
+    let mut rng = rand::thread_rng();
+    for handle in &query {
+        let v = between.sample(&mut rng);
+        let mesh = meshes.get_mut(&handle.0).expect("getting mesh");
+        let c = (if v > 0.5 { Color::GREEN } else { Color::RED }).as_rgba_f32();
+        let vertex_colors: Vec<[f32; 4]> = vec![c, c, c, c];
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vertex_colors);
     }
 }
