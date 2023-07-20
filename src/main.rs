@@ -72,15 +72,9 @@ fn setup(
         .cartesian_product(0..=table.num_rows)
         .map(|(x, y)| [x as f32 * (w + p), y as f32 * (h + p)])
         .collect::<Vec<_>>();
-    let between = Uniform::try_from(0.0..1.0).unwrap();
-    let mut rng = rand::thread_rng();
-    for point in positions {
-        let v = between.sample(&mut rng);
 
-        let mut mesh = Mesh::from(shape::Quad::new(Vec2::new(w, h)));
-        let c = (if v > 0.5 { Color::GREEN } else { Color::RED }).as_rgba_f32();
-        let vertex_colors: Vec<[f32; 4]> = vec![c, c, c, c];
-        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vertex_colors);
+    for point in positions {
+        let mesh = Mesh::from(shape::Quad::new(Vec2::new(w, h)));
         let mesh_handle: Mesh2dHandle = meshes.add(mesh).into();
         commands
             .spawn(MaterialMesh2dBundle {
@@ -97,14 +91,16 @@ fn setup(
     }
 }
 
-fn randomize_values(query: Query<&Mesh2dHandle, With<Cell>>, mut meshes: ResMut<Assets<Mesh>>) {
+fn randomize_values(
+    query: Query<&Handle<ColorMaterial>, With<Cell>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
     let between = Uniform::try_from(0.0..1.0).unwrap();
     let mut rng = rand::thread_rng();
     for handle in &query {
         let v = between.sample(&mut rng);
-        let mesh = meshes.get_mut(&handle.0).expect("getting mesh");
-        let c = (if v > 0.5 { Color::GREEN } else { Color::RED }).as_rgba_f32();
-        let vertex_colors: Vec<[f32; 4]> = vec![c, c, c, c];
-        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vertex_colors);
+        let color = materials.get_mut(&handle).expect("getting color");
+        let c = if v > 0.5 { Color::GREEN } else { Color::RED };
+        *color = c.into();
     }
 }
